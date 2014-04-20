@@ -1,0 +1,170 @@
+package goleg
+
+/*
+#cgo LDFLAGS: -loleg
+#include <stdlib.h>
+#include <oleg.h>
+*/
+import "C"
+import "unsafe"
+import "time"
+
+const F_APPENDONLY = C.OL_F_APPENDONLY
+const F_SEMIVOL = C.OL_F_SEMIVOL
+const F_REGDUMPS = C.OL_F_REGDUMPS
+
+func COpen(path, name string, features int) *C.ol_database {
+	// Turn parameters into their C counterparts
+	cpath := C.CString(path)
+	defer C.free(unsafe.Pointer(cpath))
+
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+
+	cfeats := C.int(features)
+
+	// Pass them to ol_open
+	return C.ol_open(cpath, cname, cfeats)
+}
+
+func CClose(database *C.ol_database) int {
+	return int(C.ol_close(database))
+}
+
+func CCloseSave(database *C.ol_database) int {
+	return int(C.ol_close_save(database))
+}
+
+func CUnjar(db *C.ol_database, key string, klen uintptr) *C.uchar {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+
+	// Pass them to ol_unjar
+	return C.ol_unjar(db, ckey, cklen)
+}
+
+func CUnjarDs(db *C.ol_database, key string, klen uintptr, dsize *uintptr) []byte {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen  := (C.size_t)(klen)
+	cdsize := (*C.size_t)(unsafe.Pointer(dsize))
+
+	// Pass them to ol_unjar_ds
+	var ptr *C.uchar = C.ol_unjar_ds(db, ckey, cklen, cdsize)
+	if ptr == nil {
+		return nil
+	}
+	// Retrieve data in Go []bytes
+	return C.GoBytes(unsafe.Pointer(ptr), C.int(*dsize))
+}
+
+func CJar(db *C.ol_database, key string, klen uintptr, value []byte, vsize uintptr) int {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+	cvsize := (C.size_t)(vsize)
+
+	cvalue := (*C.uchar)(unsafe.Pointer(&value[0]))
+
+	// Pass them to ol_jar
+	return int(C.ol_jar(db, ckey, cklen, cvalue, cvsize))
+}
+
+func CJarCt(db *C.ol_database, key string, klen uintptr, value []byte, vsize uintptr, ctype string, ctsize uintptr) int {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cctype := C.CString(ctype)
+	defer C.free(unsafe.Pointer(cctype))
+
+	cklen := (C.size_t)(klen)
+	cvsize := (C.size_t)(vsize)
+	cctsize := (C.size_t)(ctsize)
+
+	cvalue := (*C.uchar)(unsafe.Pointer(&value[0]))
+
+	// Pass them to ol_jar_ct
+	return int(C.ol_jar_ct(db, ckey, cklen, cvalue, cvsize, cctype, cctsize))
+}
+
+func CContentType(db *C.ol_database, key string, klen uintptr) string {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+
+	// Pass them to ol_content_type
+	return C.GoString(C.ol_content_type(db, ckey, cklen))
+}
+
+func CScoop(db *C.ol_database, key string, klen uintptr) int {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+
+	// Pass them to ol_scoop
+	return int(C.ol_scoop(db, ckey, cklen))
+}
+
+func CUptime(db *C.ol_database) int {
+	return int(C.ol_uptime(db))
+}
+
+func CExpirationTime(db *C.ol_database, key string, klen uintptr) (time.Time, bool) {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+
+	// Pass them to ol_expiration_time
+	ctime := C.ol_expiration_time(db, ckey, cklen)
+
+	// Does the expiration exist? If no, return false as second param
+	if ctime == nil {
+		return time.Now(), false
+	}
+
+	// turn ctime into a Go datatype
+	gotime := time.Date(int(ctime.tm_year)+1900,
+	                    time.Month(int(ctime.tm_mon)+1),
+	                    int(ctime.tm_mday),
+	                    int(ctime.tm_hour),
+	                    int(ctime.tm_min),
+	                    int(ctime.tm_sec),
+	                    0, time.Local)
+	return gotime, true
+}
+
+func CSpoil(db *C.ol_database, key string, klen uintptr, expiration time.Time) int {
+	// Turn parameters into their C counterparts
+	ckey := C.CString(key)
+	defer C.free(unsafe.Pointer(ckey))
+
+	cklen := (C.size_t)(klen)
+
+	exp := expiration
+
+	var ctime C.struct_tm
+	ctime.tm_year  = C.int(exp.Year()-1900)
+	ctime.tm_mon   = C.int(int(exp.Month())-1)
+	ctime.tm_mday  = C.int(exp.Day())
+	ctime.tm_hour  = C.int(exp.Hour())
+	ctime.tm_min   = C.int(exp.Minute())
+	ctime.tm_sec   = C.int(exp.Second())
+
+	// Pass them to ol_spoil
+	return int(C.ol_spoil(db, ckey, cklen, &ctime))
+
+}
