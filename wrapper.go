@@ -12,6 +12,7 @@ import "time"
 const F_APPENDONLY = C.OL_F_APPENDONLY
 const F_SEMIVOL = C.OL_F_SEMIVOL
 const F_REGDUMPS = C.OL_F_REGDUMPS
+const F_LZ4 = C.OL_F_LZ4
 
 func COpen(path, name string, features int) *C.ol_database {
 	// Turn parameters into their C counterparts
@@ -35,7 +36,7 @@ func CCloseSave(database *C.ol_database) int {
 	return int(C.ol_close_save(database))
 }
 
-func CUnjar(db *C.ol_database, key string, klen uintptr) *C.uchar {
+func CUnjar(db *C.ol_database, key string, klen uintptr, dsize uintptr) []byte {
 	// Turn parameters into their C counterparts
 	ckey := C.CString(key)
 	defer C.free(unsafe.Pointer(ckey))
@@ -43,7 +44,18 @@ func CUnjar(db *C.ol_database, key string, klen uintptr) *C.uchar {
 	cklen := (C.size_t)(klen)
 
 	// Pass them to ol_unjar
-	return C.ol_unjar(db, ckey, cklen)
+	var ptr *C.uchar
+	res := C.ol_unjar(db, ckey, cklen, &ptr)
+	if res == 1 {
+		return nil
+	}
+	// Retrieve data in Go []bytes
+	data := C.GoBytes(unsafe.Pointer(ptr), C.int(dsize))
+
+	// Free C pointer
+	C.free(unsafe.Pointer(ptr))
+
+	return data
 }
 
 func CUnjarDs(db *C.ol_database, key string, klen uintptr, dsize *uintptr) []byte {
@@ -51,16 +63,22 @@ func CUnjarDs(db *C.ol_database, key string, klen uintptr, dsize *uintptr) []byt
 	ckey := C.CString(key)
 	defer C.free(unsafe.Pointer(ckey))
 
-	cklen  := (C.size_t)(klen)
+	cklen := (C.size_t)(klen)
 	cdsize := (*C.size_t)(unsafe.Pointer(dsize))
 
 	// Pass them to ol_unjar_ds
-	var ptr *C.uchar = C.ol_unjar_ds(db, ckey, cklen, cdsize)
-	if ptr == nil {
+	var ptr *C.uchar
+	res := C.ol_unjar_ds(db, ckey, cklen, &ptr, cdsize)
+	if res == 1 {
 		return nil
 	}
 	// Retrieve data in Go []bytes
-	return C.GoBytes(unsafe.Pointer(ptr), C.int(*dsize))
+	data := C.GoBytes(unsafe.Pointer(ptr), C.int(*dsize))
+
+	// Free C pointer
+	C.free(unsafe.Pointer(ptr))
+
+	return data
 }
 
 func CJar(db *C.ol_database, key string, klen uintptr, value []byte, vsize uintptr) int {
@@ -138,12 +156,12 @@ func CExpirationTime(db *C.ol_database, key string, klen uintptr) (time.Time, bo
 
 	// turn ctime into a Go datatype
 	gotime := time.Date(int(ctime.tm_year)+1900,
-	                    time.Month(int(ctime.tm_mon)+1),
-	                    int(ctime.tm_mday),
-	                    int(ctime.tm_hour),
-	                    int(ctime.tm_min),
-	                    int(ctime.tm_sec),
-	                    0, time.Local)
+		time.Month(int(ctime.tm_mon)+1),
+		int(ctime.tm_mday),
+		int(ctime.tm_hour),
+		int(ctime.tm_min),
+		int(ctime.tm_sec),
+		0, time.Local)
 	return gotime, true
 }
 
@@ -157,12 +175,12 @@ func CSpoil(db *C.ol_database, key string, klen uintptr, expiration time.Time) i
 	exp := expiration
 
 	var ctime C.struct_tm
-	ctime.tm_year  = C.int(exp.Year()-1900)
-	ctime.tm_mon   = C.int(int(exp.Month())-1)
-	ctime.tm_mday  = C.int(exp.Day())
-	ctime.tm_hour  = C.int(exp.Hour())
-	ctime.tm_min   = C.int(exp.Minute())
-	ctime.tm_sec   = C.int(exp.Second())
+	ctime.tm_year = C.int(exp.Year() - 1900)
+	ctime.tm_mon = C.int(int(exp.Month()) - 1)
+	ctime.tm_mday = C.int(exp.Day())
+	ctime.tm_hour = C.int(exp.Hour())
+	ctime.tm_min = C.int(exp.Minute())
+	ctime.tm_sec = C.int(exp.Second())
 
 	// Pass them to ol_spoil
 	return int(C.ol_spoil(db, ckey, cklen, &ctime))
