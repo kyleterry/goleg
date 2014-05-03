@@ -9,12 +9,14 @@ import "C"
 import "time"
 
 type Database struct {
-	db *C.ol_database
+	db          *C.ol_database
+	RecordCount *C.int
 }
 
 func Open(path, name string, features int) Database {
 	var database Database
 	database.db = COpen(path, name, features)
+	database.RecordCount = &database.db.rcrd_cnt
 	return database
 }
 
