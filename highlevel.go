@@ -60,3 +60,7 @@ func (d Database) Expiration(key string) (time.Time, bool) {
 func (d Database) Spoil(key string, expiration time.Time) int {
 	return CSpoil(d.db, key, uintptr(len(key)), expiration)
 }
+
+func (d Database) Exists(key string) bool {
+	return CExists(d.db, key, uintptr(len(key))) == 0
+}
