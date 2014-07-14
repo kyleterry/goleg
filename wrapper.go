@@ -32,10 +32,6 @@ func CClose(database *C.ol_database) int {
 	return int(C.ol_close(database))
 }
 
-func CCloseSave(database *C.ol_database) int {
-	return int(C.ol_close_save(database))
-}
-
 func CUnjar(db *C.ol_database, key string, klen uintptr, dsize uintptr) []byte {
 	// Turn parameters into their C counterparts
 	ckey := C.CString(key)
