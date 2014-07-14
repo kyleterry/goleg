@@ -10,10 +10,9 @@ import "unsafe"
 import "time"
 
 const F_APPENDONLY = C.OL_F_APPENDONLY
-const F_SEMIVOL = C.OL_F_SEMIVOL
-const F_REGDUMPS = C.OL_F_REGDUMPS
 const F_LZ4 = C.OL_F_LZ4
 const F_SPLAYTREE = C.OL_F_SPLAYTREE
+const F_AOL_FFLUSH = C.OL_F_AOL_FFLUSH
 
 func COpen(path, name string, features int) *C.ol_database {
 	// Turn parameters into their C counterparts
